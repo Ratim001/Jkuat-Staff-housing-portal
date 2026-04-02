@@ -1,0 +1,9 @@
+.env
+logs/
+vendor/
+/.idea
+/.vscode
+*.log
+
+# Local-only testing utilities
+/tools/generate_password_hash.php
