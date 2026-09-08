@@ -1,219 +1,69 @@
-# JKUAT Housing Portal - Setup Guide
+# Local installation
 
-## Quick Start
+Use an isolated development database and fictional records.
 
-This guide explains how to set up the Housing Portal after installing XAMPP or reinstalling the system.
+## 1. Install dependencies
 
----
-
-## Step 1: Install XAMPP
-
-1. Download XAMPP from [apachefriends.org](https://www.apachefriends.org/)
-2. Install and start Apache, MySQL, and PHP
-3. Default database credentials:
-   - **Host**: `127.0.0.1` or `localhost`
-   - **Port**: `3306` (MySQL)
-   - **User**: `root`
-   - **Password**: (empty by default)
-
----
-
-## Step 2: Create Environment Configuration
-
-1. Copy `jkuat-housing-portal/.env.example` to `jkuat-housing-portal/.env`
-2. Update the `.env` file with your configuration:
-
-```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=staff_housing
-DB_USER=root
-DB_PASS=
-APP_URL=http://localhost/jkuat-housing-portal
-```
-
----
-
-## Step 3: Import Initial Database Schema
-
-This is the **CRITICAL STEP** that restores your database after XAMPP reinstallation.
-
-### Option A: Using phpMyAdmin (Easiest)
-
-1. Start XAMPP (Apache + MySQL)
-2. Open phpMyAdmin: `http://localhost/phpmyadmin`
-3. Click **Import** tab
-4. Choose file: `jkuat-housing-portal/staff_housing (1).sql`
-5. Click **Import**
-6. You should see: "Import has been successfully finished, X queries executed."
-
-### Option B: Using MySQL Command Line
+Install PHP 8.2+ with mysqli, MariaDB, Composer, and Apache (for example through XAMPP). Run from the web server's document directory:
 
 ```bash
-# Navigate to project directory
-cd c:\xampp\htdocs\jkuat-housing-portal
-
-# Import the database
-mysql -h localhost -u root staff_housing < "staff_housing (1).sql"
+git clone https://github.com/Ratim001/Jkuat-Staff-housing-portal.git jkuat-housing-portal
+cd jkuat-housing-portal
+composer install
 ```
 
-**Note**: If you get "Unknown database", first create it:
-```bash
-mysql -h localhost -u root -e "CREATE DATABASE staff_housing"
-mysql -h localhost -u root staff_housing < "staff_housing (1).sql"
-```
+The clone directory is the application root. Do not create a nested second copy.
 
-### Option C: Using PHP Script
+## 2. Configure the environment
 
-```bash
-cd c:\xampp\htdocs\jkuat-housing-portal
-php -r "
-    \$conn = new mysqli('localhost', 'root', '', 'staff_housing');
-    if (\$conn->connect_error) die('Connection failed: ' . \$conn->connect_error);
-    \$sql = file_get_contents('staff_housing (1).sql');
-    if (\$conn->multi_query(\$sql)) echo 'Database imported successfully';
-    else echo 'Error: ' . \$conn->error;
-"
-```
+Copy `.env.example` to `.env` and configure `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, and `APP_URL`. For XAMPP, the URL can be `http://localhost/jkuat-housing-portal/`. Keep this file untracked.
 
----
+## 3. Create an empty database and import structure
 
-## Step 4: Run Database Migrations
+In phpMyAdmin, create a new database named `staff_housing`, select it, and import `database/schema.sql`.
 
-After importing the initial schema, apply all project-specific changes:
+Alternatively, in a shell that supports input redirection:
 
 ```bash
-cd c:\xampp\htdocs\jkuat-housing-portal
-php migrations/run_migrations.php
+mysql -h localhost -u root -p -e "CREATE DATABASE staff_housing CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"
+mysql -h localhost -u root -p staff_housing < database/schema.sql
 ```
 
-**What this does:**
-- Applies all pending migration files
-- Skips migrations that have already been run
-- Logs execution in database for tracking
-- Safe to run multiple times (won't duplicate changes)
+Use your own database user and configured database name. These commands are for a NEW database. Do not import the initial schema over an existing installation.
 
-### Check Migration Status (Optional)
+The schema contains no staff accounts, applicant data, bills, or tenant records.
+
+## 4. Apply migrations
 
 ```bash
 php migrations/run_migrations.php --status
+php migrations/run_migrations.php
+php migrations/run_migrations.php --status
 ```
 
-This shows which migrations are pending without applying them.
+The runner records completed files in `schema_migrations`. Keep applied migration files unchanged. Some historical migrations use MariaDB-specific syntax; do not assume the included MySQL Docker configuration has equivalent behavior.
 
----
+## 5. Create a local administrator
 
-## Step 5: Verify Setup
+```bash
+php migrations/seed_admin.php
+```
 
-1. Navigate to: `http://localhost/jkuat-housing-portal/php/login.php`
-2. Try logging in with these test credentials:
+This creates a fictional `admin` account with a newly generated password, displayed once in your local terminal. It does not reset an existing administrator. Store the generated password privately.
 
-   | Username | PF Number | Status |
-   |----------|-----------|--------|
-   | Maxwell  | 3040      | Tenant |
-   | Jack     | 3035      | Tenant |
-   | Ratim    | 5000      | Tenant |
+Open `http://localhost/jkuat-housing-portal/php/login.php` and log in with that generated account. Populate demonstration houses and applicants with fictional values.
 
-3. If you can access your dashboard, the setup is complete ✓
+## 6. Verify workflows
 
----
+Follow [HANDOVER.md](HANDOVER.md). A successful schema import is only the beginning; test the application with each role.
 
-## Important: Database Persistence After XAMPP Reinstall
+## Recovering previous records
 
-### The Problem
-When you reinstall XAMPP, the MySQL databases are removed. Your project files and code changes remain, but the database goes back to empty.
-
-### The Solution
-This setup process restores the database completely:
-
-1. **Initial import** (`staff_housing (1).sql`) restores the base schema and tables
-2. **Migrations** (`migrations/run_migrations.php`) apply all feature updates and changes
-
-Together, these ensure your database is in the exact same state as your development system.
-
-### Recovery Process After XAMPP Reinstall
-
-Simply repeat **Steps 2-5** above. The entire database state will be restored exactly.
-
----
+A fresh schema and migrations cannot restore old records after reinstalling XAMPP. Restore an authorized private database backup and uploaded-file backup instead; see [DEPLOYMENT.md](DEPLOYMENT.md). Never commit those backups.
 
 ## Troubleshooting
 
-### "Unknown database 'staff_housing'"
-**Solution:** Create the database first:
-```bash
-mysql -h localhost -u root -e "CREATE DATABASE staff_housing"
-```
-
-### "Access denied for user 'root'@'localhost'"
-**Solution:** XAMPP MySQL might have a password. Check `.env` file and update `DB_PASS`:
-```env
-DB_PASS=your_mysql_password
-```
-
-### Migrations not running / stuck
-**Solution:** Check log file:
-```bash
-cat logs/migration.log
-```
-
-Or re-run with verbose output:
-```bash
-php migrations/run_migrations.php
-```
-
-### Pages not loading after setup
-**Possible causes:**
-- Apache not running (start in XAMPP Control Panel)
-- MySQL not running (start in XAMPP Control Panel)
-- Incorrect database credentials in `.env` file
-- Application files not in `c:\xampp\htdocs\jkuat-housing-portal`
-
----
-
-## Project Structure
-
-```
-jkuat-housing-portal/
-├── php/                          # Main application files
-│   ├── applicants.php           # Applicant dashboard
-│   ├── applicant_profile.php    # Profile management
-│   ├── login.php                # Login page
-│   ├── ballot.php               # Ballot system
-│   ├── bills.php                # Bill management
-│   └── ... (other pages)
-├── migrations/                   # Database migrations
-│   ├── run_migrations.php       # Main migration runner
-│   ├── 2026-02-11_*.sql        # Feature migrations
-│   └── README.md                # Migration documentation
-├── includes/                     # PHP utilities
-│   ├── db.php                   # Database connection
-│   ├── auth.php                 # Authentication logic
-│   ├── email.php                # Email utilities
-│   └── validation.php           # Form validation
-├── css/                          # Stylesheets
-├── js/                           # JavaScript files
-├── staff_housing (1).sql        # Initial database schema
-├── .env                          # Configuration (GITIGNORED)
-├── .env.example                  # Configuration template
-└── README.md                     # Project documentation
-```
-
----
-
-## Next Steps
-
-After setup is complete:
-
-1. **For Development**: See [README.md](README.md) for feature documentation
-2. **For Database Queries**: See [migrations/README.md](migrations/README.md) for migration info
-3. **For Deployment**: See [DEPLOYMENT.md](DEPLOYMENT.md) for production setup
-
----
-
-## Support
-
-- **Check logs**: `jkuat-housing-portal/logs/` directory
-- **Database help**: Review migration files in `jkuat-housing-portal/migrations/`
-- **PHP errors**: Check browser console and XAMPP error logs
-
+- Connection failures: confirm MariaDB is running and `.env` matches your database.
+- Missing PHP dependencies: run `composer install` and check enabled extensions.
+- Failed migration: capture the failing filename and error privately; inspect the database before retrying. Do not use `--force` as a default remedy.
+- Email failures: verify SMTP configuration using a test mailbox.

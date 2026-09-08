@@ -7,3 +7,11 @@ vendor/
 
 # Local-only testing utilities
 /tools/generate_password_hash.php
+
+# Private backups and uploaded applicant files
+/backups/
+/backup*.sql
+/staff_housing*.sql
+/images/uploads/*
+!/images/uploads/.gitkeep
+/jkuat-housing-portal/

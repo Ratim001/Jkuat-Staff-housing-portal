@@ -1,53 +1,45 @@
 <?php
 /**
- * migrations/seed_admin.php
- * Purpose: Insert a single admin user into `users` table. Reads DB credentials from environment variables.
- * Author: repo automation / commit: migrations: add seed_admin
- *
+ * Create a fictional local admin with a generated password.
  * Usage: php migrations/seed_admin.php
- * Ensure environment variables DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS are set.
+ * Existing accounts are never overwritten.
  */
-
-$dbHost = getenv('DB_HOST') ?: '127.0.0.1';
-$dbPort = getenv('DB_PORT') ?: '3306';
-$dbName = getenv('DB_NAME') ?: 'staff_housing';
-$dbUser = getenv('DB_USER') ?: 'root';
-$dbPass = getenv('DB_PASS') ?: '';
-
-$mysqli = new mysqli($dbHost, $dbUser, $dbPass, $dbName, (int)$dbPort);
-if ($mysqli->connect_errno) {
-    fwrite(STDERR, "Connection failed: " . $mysqli->connect_error . PHP_EOL);
-    exit(1);
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit('Run this script from the command line.');
 }
 
-$adminId = 'U001';
+require_once __DIR__ . '/../includes/db.php';
+
 $username = 'admin';
+$check = $conn->prepare('SELECT user_id FROM users WHERE username = ? LIMIT 1');
+$check->bind_param('s', $username);
+$check->execute();
+if ($check->get_result()->num_rows > 0) {
+    echo "Admin user already exists; no changes made.\n";
+    exit(0);
+}
+$check->close();
+
+$userId = 'DEMO-' . bin2hex(random_bytes(8));
+$pfNo = $userId;
+$name = 'Demo Administrator';
 $email = 'admin@example.com';
 $role = 'CS Admin';
 $status = 'Active';
+$password = bin2hex(random_bytes(16));
+$hash = password_hash($password, PASSWORD_DEFAULT);
 
-// Generate a random password (do NOT commit or store this in source control).
-$rawPassword = bin2hex(random_bytes(8)); // 16 hex chars (~128 bits)
-$passwordHash = password_hash($rawPassword, PASSWORD_DEFAULT);
-
-$stmt = $mysqli->prepare("SELECT user_id FROM users WHERE username = ? LIMIT 1");
-$stmt->bind_param('s', $username);
-$stmt->execute();
-$res = $stmt->get_result();
-if ($res->num_rows > 0) {
-    echo "Admin user already exists.\n";
-    exit(0);
-}
-
-$insert = $mysqli->prepare("INSERT INTO users (user_id, username, email, password, role, status) VALUES (?, ?, ?, ?, ?, ?)");
-$insert->bind_param('ssssss', $adminId, $username, $email, $passwordHash, $role, $status);
-if ($insert->execute()) {
-    echo "Admin user inserted (username: admin).\n";
-    echo "Generated password (store securely): $rawPassword\n";
-    echo "IMPORTANT: Save this password securely and change it after first login. This script does NOT store plaintext passwords in source.\n";
-} else {
-    fwrite(STDERR, "Insert failed: " . $mysqli->error . PHP_EOL);
+$insert = $conn->prepare(
+    'INSERT INTO users (user_id, pf_no, username, name, email, role, password, date_created, status) '
+    . 'VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)'
+);
+$insert->bind_param('ssssssss', $userId, $pfNo, $username, $name, $email, $role, $hash, $status);
+if (!$insert->execute()) {
+    fwrite(STDERR, "Could not create the administrator. Check the database privately.\n");
     exit(1);
 }
-
-$mysqli->close();
+echo "Created fictional local account: admin\n";
+echo "Generated password (store privately): " . $password . "\n";
+$insert->close();
+$conn->close();
